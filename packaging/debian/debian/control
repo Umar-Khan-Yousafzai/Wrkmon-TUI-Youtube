@@ -1,7 +1,7 @@
 Source: wrkmon
 Section: sound
 Priority: optional
-Maintainer: Umar Khan Yousafzai <umar@example.com>
+Maintainer: Umar Khan Yousafzai <ionkhan@gmail.com>
 Build-Depends: debhelper-compat (= 13), python3, python3-pip, python3-venv
 Standards-Version: 4.6.0
 Homepage: https://github.com/Umar-Khan-Yousafzai/Wrkmon-TUI-Youtube

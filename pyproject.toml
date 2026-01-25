@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-    { name = "Umar Khan Yousafzai", email = "umar@example.com" }
+    { name = "Umar Khan Yousafzai", email = "ionkhan@gmail.com" }
 ]
 keywords = ["youtube", "audio", "player", "tui", "music", "stealth", "productivity", "terminal"]
 classifiers = [
