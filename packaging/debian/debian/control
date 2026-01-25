@@ -1,0 +1,21 @@
+Source: wrkmon
+Section: sound
+Priority: optional
+Maintainer: Umar Khan Yousafzai <umar@example.com>
+Build-Depends: debhelper-compat (= 13), python3, python3-pip, python3-venv
+Standards-Version: 4.6.0
+Homepage: https://github.com/Umar-Khan-Yousafzai/Wrkmon-TUI-Youtube
+
+Package: wrkmon
+Architecture: all
+Depends: ${misc:Depends}, python3 (>= 3.10), mpv
+Description: Stealth TUI YouTube audio player
+ wrkmon is a terminal-based YouTube audio player that runs completely
+ hidden in the background. Stream music while looking productive!
+ .
+ Features:
+  - Search and stream YouTube audio
+  - No visible windows - completely stealth
+  - TUI interface with keyboard controls
+  - Queue management with shuffle/repeat
+  - Play history and playlists

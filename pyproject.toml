@@ -5,31 +5,36 @@ build-backend = "hatchling.build"
 [project]
 name = "wrkmon"
 version = "1.0.0"
-description = "Work Monitor - A developer productivity tool"
+description = "Stealth TUI YouTube audio player - stream music while looking productive"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-    { name = "Developer", email = "dev@example.com" }
+    { name = "Umar Khan Yousafzai", email = "umar@example.com" }
 ]
-keywords = ["monitor", "productivity", "cli", "tui"]
+keywords = ["youtube", "audio", "player", "tui", "music", "stealth", "productivity", "terminal"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Players",
 ]
 dependencies = [
     "textual>=0.50.0",
     "typer>=0.9.0",
     "yt-dlp>=2024.0.0",
-    "python-mpv-jsonipc>=1.2.0",
     "rich>=13.0.0",
+    "pywin32>=306; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
@@ -42,9 +47,10 @@ dev = [
 wrkmon = "wrkmon.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/example/wrkmon"
-Documentation = "https://github.com/example/wrkmon#readme"
-Repository = "https://github.com/example/wrkmon"
+Homepage = "https://github.com/Umar-Khan-Yousafzai/Wrkmon-TUI-Youtube"
+Documentation = "https://github.com/Umar-Khan-Yousafzai/Wrkmon-TUI-Youtube#readme"
+Repository = "https://github.com/Umar-Khan-Yousafzai/Wrkmon-TUI-Youtube"
+Issues = "https://github.com/Umar-Khan-Yousafzai/Wrkmon-TUI-Youtube/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["wrkmon"]

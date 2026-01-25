@@ -1,0 +1,43 @@
+name: wrkmon
+version: '1.0.0'
+summary: Stealth TUI YouTube audio player
+description: |
+  wrkmon is a terminal-based YouTube audio player that runs completely
+  hidden in the background. Stream music while looking productive!
+
+  Features:
+  - Search and stream YouTube audio
+  - No visible windows - completely stealth
+  - TUI interface with keyboard controls
+  - Queue management with shuffle/repeat
+  - Play history and playlists
+
+grade: stable
+confinement: strict
+base: core22
+
+apps:
+  wrkmon:
+    command: bin/wrkmon
+    plugs:
+      - home
+      - network
+      - audio-playback
+      - pulseaudio
+
+parts:
+  mpv:
+    plugin: nil
+    stage-packages:
+      - mpv
+      - libmpv1
+
+  wrkmon:
+    plugin: python
+    source: .
+    python-packages:
+      - pip
+      - wheel
+    stage-packages:
+      - python3
+    after: [mpv]

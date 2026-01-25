@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>wrkmon</id>
+    <version>1.0.0</version>
+    <title>wrkmon - Stealth YouTube Audio Player</title>
+    <authors>Umar Khan Yousafzai</authors>
+    <owners>Umar Khan Yousafzai</owners>
+    <projectUrl>https://github.com/Umar-Khan-Yousafzai/Wrkmon-TUI-Youtube</projectUrl>
+    <licenseUrl>https://github.com/Umar-Khan-Yousafzai/Wrkmon-TUI-Youtube/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/Umar-Khan-Yousafzai/Wrkmon-TUI-Youtube</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/Umar-Khan-Yousafzai/Wrkmon-TUI-Youtube/issues</bugTrackerUrl>
+    <tags>youtube audio player tui terminal music stealth productivity</tags>
+    <summary>Stealth TUI YouTube audio player - stream music while looking productive</summary>
+    <description>
+wrkmon is a terminal-based YouTube audio player that runs completely hidden in the background.
+
+## Features
+- Search and stream YouTube audio
+- No visible windows - completely stealth
+- TUI interface with keyboard controls
+- Queue management with shuffle/repeat
+- Play history and playlists
+- Cross-platform (Windows, macOS, Linux)
+
+## Usage
+Simply run `wrkmon` in your terminal to start the TUI interface.
+
+## Controls
+- F1-F4: Switch views (Search, Queue, History, Playlists)
+- F5: Play/Pause
+- F9: Stop
+- F10: Add to queue
+- /: Focus search
+    </description>
+    <dependencies>
+      <dependency id="python" version="[3.10,)" />
+      <dependency id="mpv" version="[0.35,)" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
