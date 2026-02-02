@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>wrkmon</id>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <title>wrkmon - Terminal YouTube Music Player</title>
     <authors>Umar Khan Yousafzai</authors>
     <owners>Umar Khan Yousafzai</owners>

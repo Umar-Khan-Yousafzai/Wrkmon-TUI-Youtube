@@ -3,7 +3,7 @@ class Wrkmon < Formula
 
   desc "Stealth TUI YouTube audio player - stream music while looking productive"
   homepage "https://github.com/Umar-Khan-Yousafzai/Wrkmon-TUI-Youtube"
-  url "https://files.pythonhosted.org/packages/source/w/wrkmon/wrkmon-1.0.0.tar.gz"
+  url "https://files.pythonhosted.org/packages/source/w/wrkmon/wrkmon-1.1.0.tar.gz"
   sha256 "REPLACE_WITH_ACTUAL_SHA256_AFTER_PYPI_UPLOAD"
   license "MIT"
 

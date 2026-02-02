@@ -1,5 +1,6 @@
 """Main TUI application for wrkmon - properly structured with Textual best practices."""
 
+import asyncio
 import logging
 import sys
 from pathlib import Path
@@ -40,6 +41,12 @@ from wrkmon.ui.messages import (
     TrackQueued,
     StatusMessage,
     PlaybackStateChanged,
+)
+from wrkmon.utils.updater import (
+    check_for_updates_async,
+    check_dependencies,
+    get_js_runtime,
+    install_deno_async,
 )
 
 
@@ -119,6 +126,12 @@ class WrkmonApp(App):
         # Set terminal title
         self._stealth.set_terminal_title("wrkmon")
 
+        # Check for updates in background
+        self._check_for_updates_task = asyncio.create_task(self._check_for_updates())
+
+        # Check dependencies
+        await self._check_dependencies()
+
         # Check if mpv is available
         from wrkmon.utils.mpv_installer import is_mpv_installed, ensure_mpv_installed
 
@@ -160,6 +173,41 @@ class WrkmonApp(App):
 
         # Update header view indicator
         self._get_header().set_view_name("search")
+
+    async def _check_for_updates(self) -> None:
+        """Check for updates in background."""
+        try:
+            update_info = await check_for_updates_async()
+            if update_info and update_info.is_update_available:
+                self._get_header().set_update_info(
+                    available=True,
+                    version=update_info.latest_version
+                )
+                self.notify(
+                    f"New version {update_info.latest_version} available!\n"
+                    f"Run: {update_info.update_command}",
+                    title="Update Available",
+                    timeout=8
+                )
+                logger.info(f"Update available: {update_info.latest_version}")
+        except Exception as e:
+            logger.debug(f"Update check failed: {e}")
+
+    async def _check_dependencies(self) -> None:
+        """Check optional dependencies and notify user."""
+        try:
+            js_runtime = get_js_runtime()
+            if not js_runtime:
+                # No JavaScript runtime - suggest installing deno
+                self.notify(
+                    "Install deno for better YouTube compatibility:\n"
+                    "curl -fsSL https://deno.land/install.sh | sh",
+                    title="Tip: Install deno",
+                    timeout=6
+                )
+                logger.info("No JavaScript runtime found, suggesting deno installation")
+        except Exception as e:
+            logger.debug(f"Dependency check failed: {e}")
 
     # ----------------------------------------
     # Component getters
@@ -329,12 +377,18 @@ class WrkmonApp(App):
     # ----------------------------------------
     async def _update_playback_display(self) -> None:
         """Update the player bar with current playback position."""
+        player_bar = self._get_player_bar()
+
+        # Always sync repeat mode to player bar
+        try:
+            player_bar.repeat_mode = self.queue.repeat_mode
+        except Exception:
+            pass
+
         if not self._current_track:
             return
 
         try:
-            player_bar = self._get_player_bar()
-
             # Get current position and duration via IPC
             pos = await self.player.get_position()
             dur = await self.player.get_duration()
@@ -391,6 +445,12 @@ class WrkmonApp(App):
                 self.query_one("#queue", QueueView).refresh_queue()
             except Exception:
                 pass
+        # Auto-focus list when switching to search (if has results)
+        elif view_name == "search":
+            try:
+                self.query_one("#search", SearchView).focus_list()
+            except Exception:
+                pass
 
     async def action_toggle_pause(self) -> None:
         """Smart play/pause - starts playback if nothing playing."""
@@ -406,6 +466,18 @@ class WrkmonApp(App):
             logger.info("  -> Toggling pause (already playing)")
             await self.toggle_pause()
             return
+
+        # Nothing playing - if in search view with selected item, play it
+        if self._current_view == "search":
+            try:
+                search_view = self.query_one("#search", SearchView)
+                result = search_view._get_selected()
+                if result:
+                    logger.info(f"  -> Playing selected search result: {result.title}")
+                    await self.play_track(result)
+                    return
+            except Exception:
+                pass
 
         # Nothing playing - try to play from queue
         current = self.queue.current

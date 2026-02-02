@@ -5,6 +5,7 @@ from textual.containers import Horizontal
 from textual.reactive import reactive
 from textual.widgets import Static
 
+from wrkmon import __version__
 from wrkmon.utils.stealth import get_stealth
 
 
@@ -13,6 +14,8 @@ class HeaderBar(Static):
 
     cpu = reactive(23)
     mem = reactive(45)
+    update_available = reactive(False)
+    latest_version = reactive("")
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -20,7 +23,8 @@ class HeaderBar(Static):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="header-inner"):
-            yield Static("WRKMON", id="app-title")
+            yield Static(f"WRKMON v{__version__}", id="app-title")
+            yield Static("", id="update-indicator")
             yield Static("", id="current-view")
             yield Static(self._format_stats(), id="sys-stats")
 
@@ -44,10 +48,31 @@ class HeaderBar(Static):
         """React to memory changes."""
         self._refresh_stats()
 
+    def watch_update_available(self) -> None:
+        """React to update availability changes."""
+        self._refresh_update_indicator()
+
+    def watch_latest_version(self) -> None:
+        """React to latest version changes."""
+        self._refresh_update_indicator()
+
     def _refresh_stats(self) -> None:
         """Update the stats display."""
         try:
             self.query_one("#sys-stats", Static).update(self._format_stats())
+        except Exception:
+            pass
+
+    def _refresh_update_indicator(self) -> None:
+        """Update the update indicator."""
+        try:
+            indicator = self.query_one("#update-indicator", Static)
+            if self.update_available and self.latest_version:
+                indicator.update(f"[UPDATE: v{self.latest_version}]")
+                indicator.add_class("update-available")
+            else:
+                indicator.update("")
+                indicator.remove_class("update-available")
         except Exception:
             pass
 
@@ -57,3 +82,8 @@ class HeaderBar(Static):
             self.query_one("#current-view", Static).update(f"/{name.upper()}")
         except Exception:
             pass
+
+    def set_update_info(self, available: bool, version: str = "") -> None:
+        """Set update availability information."""
+        self.update_available = available
+        self.latest_version = version

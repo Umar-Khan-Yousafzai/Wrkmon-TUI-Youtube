@@ -45,6 +45,18 @@ HeaderBar {
     padding: 0 1;
 }
 
+#update-indicator {
+    width: auto;
+    color: #ffff00;
+    text-style: bold;
+    padding: 0 1;
+}
+
+#update-indicator.update-available {
+    color: #ff8800;
+    text-style: bold blink;
+}
+
 /* ----------------------------------------
    PLAYER BAR (Bottom)
    ---------------------------------------- */

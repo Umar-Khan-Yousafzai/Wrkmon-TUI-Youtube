@@ -1,5 +1,5 @@
 name: wrkmon
-version: '1.0.0'
+version: '1.1.0'
 summary: Stealth TUI YouTube audio player
 description: |
   wrkmon is a terminal-based YouTube audio player that runs completely

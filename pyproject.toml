@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wrkmon"
-version = "1.0.0"
+version = "1.1.0"
 description = "Stealth TUI YouTube audio player - stream music while looking productive"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-    { name = "Umar Khan Yousafzai", email = "ionkhan@gmail.com" }
+    { name = "Umar Khan Yousafzai", email = "umerfarooqkhan325@gmail.com" }
 ]
 keywords = ["youtube", "audio", "player", "tui", "music", "stealth", "productivity", "terminal"]
 classifiers = [
@@ -31,8 +31,9 @@ classifiers = [
 dependencies = [
     "textual>=0.50.0",
     "typer>=0.9.0",
-    "yt-dlp>=2024.0.0",
+    "yt-dlp>=2025.1.0",
     "rich>=13.0.0",
+    "packaging>=21.0",
     "pywin32>=306; sys_platform == 'win32'",
 ]
 

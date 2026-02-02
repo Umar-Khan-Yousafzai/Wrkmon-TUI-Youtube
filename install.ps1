@@ -4,7 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "==================================" -ForegroundColor Cyan
-Write-Host "  wrkmon Installer for Windows" -ForegroundColor Cyan
+Write-Host "  wrkmon Installer v1.1.0" -ForegroundColor Cyan
 Write-Host "==================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -32,7 +32,7 @@ Write-Host "Python found: $version" -ForegroundColor Green
 
 # Check mpv
 Write-Host ""
-Write-Host "Step 2: Checking mpv..." -ForegroundColor Yellow
+Write-Host "Step 2: Checking mpv (required)..." -ForegroundColor Yellow
 $mpvInstalled = $false
 
 if (Get-Command mpv -ErrorAction SilentlyContinue) {
@@ -76,11 +76,60 @@ if (-not $mpvInstalled) {
     }
 }
 
+# Check deno (optional but recommended)
+Write-Host ""
+Write-Host "Step 3: Checking deno (optional, for better YouTube support)..." -ForegroundColor Yellow
+$denoInstalled = $false
+$jsRuntimeAvailable = $false
+
+if (Get-Command deno -ErrorAction SilentlyContinue) {
+    Write-Host "deno is already installed." -ForegroundColor Green
+    $denoInstalled = $true
+    $jsRuntimeAvailable = $true
+} elseif (Get-Command node -ErrorAction SilentlyContinue) {
+    Write-Host "Node.js found - JavaScript runtime available." -ForegroundColor Green
+    $jsRuntimeAvailable = $true
+}
+
+if (-not $jsRuntimeAvailable) {
+    Write-Host "Installing deno for better YouTube compatibility..." -ForegroundColor Yellow
+
+    # Try winget first
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        winget install DenoLand.Deno --silent --accept-package-agreements 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "deno installed via winget." -ForegroundColor Green
+            $denoInstalled = $true
+        }
+    }
+
+    # Try chocolatey
+    if (-not $denoInstalled -and (Get-Command choco -ErrorAction SilentlyContinue)) {
+        choco install deno -y 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "deno installed via chocolatey." -ForegroundColor Green
+            $denoInstalled = $true
+        }
+    }
+
+    # Try official installer
+    if (-not $denoInstalled) {
+        try {
+            irm https://deno.land/install.ps1 | iex
+            Write-Host "deno installed via official installer." -ForegroundColor Green
+        } catch {
+            Write-Host "Could not install deno automatically." -ForegroundColor Yellow
+            Write-Host "For better YouTube support, install manually:" -ForegroundColor Yellow
+            Write-Host "  irm https://deno.land/install.ps1 | iex" -ForegroundColor Cyan
+        }
+    }
+}
+
 # Install wrkmon
 Write-Host ""
-Write-Host "Step 3: Installing wrkmon..." -ForegroundColor Yellow
+Write-Host "Step 4: Installing wrkmon..." -ForegroundColor Yellow
 & $python -m pip install --upgrade pip
-& $python -m pip install wrkmon
+& $python -m pip install --upgrade wrkmon
 
 Write-Host ""
 Write-Host "==================================" -ForegroundColor Green
@@ -88,6 +137,11 @@ Write-Host "  Installation Complete!" -ForegroundColor Green
 Write-Host "==================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Run 'wrkmon' to start the player." -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Commands:" -ForegroundColor Yellow
+Write-Host "  wrkmon          : Launch TUI player"
+Write-Host "  wrkmon update   : Check for updates"
+Write-Host "  wrkmon deps     : Check dependencies"
 Write-Host ""
 Write-Host "Controls:" -ForegroundColor Yellow
 Write-Host "  F1-F4  : Switch views (Search, Queue, History, Playlists)"

@@ -5,7 +5,7 @@
 set -e
 
 echo "=================================="
-echo "  wrkmon Installer"
+echo "  wrkmon Installer v1.1.0"
 echo "=================================="
 echo ""
 
@@ -70,6 +70,49 @@ install_mpv() {
     esac
 }
 
+# Install deno for better YouTube compatibility (optional)
+install_deno() {
+    if command -v deno &> /dev/null; then
+        echo "deno is already installed."
+        return
+    fi
+
+    if command -v node &> /dev/null; then
+        echo "Node.js found - JavaScript runtime available."
+        echo "deno installation is optional (skipping)."
+        return
+    fi
+
+    echo "Installing deno (for better YouTube compatibility)..."
+
+    case $OS in
+        linux)
+            if command -v snap &> /dev/null; then
+                sudo snap install deno 2>/dev/null || curl -fsSL https://deno.land/install.sh | sh
+            else
+                curl -fsSL https://deno.land/install.sh | sh
+            fi
+            ;;
+        macos)
+            if command -v brew &> /dev/null; then
+                brew install deno
+            else
+                curl -fsSL https://deno.land/install.sh | sh
+            fi
+            ;;
+        windows)
+            if command -v choco &> /dev/null; then
+                choco install deno -y
+            elif command -v winget &> /dev/null; then
+                winget install DenoLand.Deno --silent
+            else
+                echo "Please install deno manually for better YouTube support:"
+                echo "  irm https://deno.land/install.ps1 | iex"
+            fi
+            ;;
+    esac
+}
+
 # Install Python if not present
 check_python() {
     if command -v python3 &> /dev/null; then
@@ -97,7 +140,7 @@ install_wrkmon() {
     echo ""
     echo "Installing wrkmon..."
     $PYTHON -m pip install --upgrade pip
-    $PYTHON -m pip install wrkmon
+    $PYTHON -m pip install --upgrade wrkmon
 }
 
 # Main
@@ -105,11 +148,15 @@ echo "Step 1: Checking Python..."
 check_python
 
 echo ""
-echo "Step 2: Installing mpv..."
+echo "Step 2: Installing mpv (required)..."
 install_mpv
 
 echo ""
-echo "Step 3: Installing wrkmon..."
+echo "Step 3: Installing deno (optional, for better YouTube support)..."
+install_deno
+
+echo ""
+echo "Step 4: Installing wrkmon..."
 install_wrkmon
 
 echo ""
@@ -118,6 +165,11 @@ echo "  Installation Complete!"
 echo "=================================="
 echo ""
 echo "Run 'wrkmon' to start the player."
+echo ""
+echo "Commands:"
+echo "  wrkmon          : Launch TUI player"
+echo "  wrkmon update   : Check for updates"
+echo "  wrkmon deps     : Check dependencies"
 echo ""
 echo "Controls:"
 echo "  F1-F4  : Switch views (Search, Queue, History, Playlists)"
