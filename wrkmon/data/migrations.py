@@ -64,6 +64,32 @@ MIGRATIONS: list[tuple[int, str, str]] = [
         );
         """,
     ),
+    (
+        2,
+        "Add queue persistence",
+        """
+        -- Queue table for persistent queue
+        CREATE TABLE IF NOT EXISTS queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            track_id INTEGER NOT NULL,
+            position INTEGER NOT NULL,
+            playback_position INTEGER DEFAULT 0,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_queue_position ON queue(position);
+
+        -- Queue state table (single row for current state)
+        CREATE TABLE IF NOT EXISTS queue_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            current_index INTEGER DEFAULT -1,
+            shuffle_mode INTEGER DEFAULT 0,
+            repeat_mode TEXT DEFAULT 'none',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT OR IGNORE INTO queue_state (id) VALUES (1);
+        """,
+    ),
 ]
 
 

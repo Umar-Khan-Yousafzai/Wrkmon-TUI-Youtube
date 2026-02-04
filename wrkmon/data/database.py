@@ -424,3 +424,123 @@ class Database:
             )
 
         return entries
+
+    # ==================== Queue Persistence ====================
+
+    def save_queue(
+        self,
+        items: list[dict],
+        current_index: int,
+        shuffle_mode: bool,
+        repeat_mode: str,
+    ) -> None:
+        """
+        Save the current queue to database.
+
+        Args:
+            items: List of dicts with video_id, title, channel, duration, playback_position
+            current_index: Current playing index
+            shuffle_mode: Whether shuffle is enabled
+            repeat_mode: 'none', 'one', or 'all'
+        """
+        # Clear existing queue
+        self._conn.execute("DELETE FROM queue")
+
+        # Save each item
+        for position, item in enumerate(items):
+            # Get or create track
+            track = self.get_or_create_track(
+                video_id=item["video_id"],
+                title=item["title"],
+                channel=item["channel"],
+                duration=item["duration"],
+            )
+
+            self._conn.execute(
+                """
+                INSERT INTO queue (track_id, position, playback_position)
+                VALUES (?, ?, ?)
+                """,
+                (track.id, position, item.get("playback_position", 0)),
+            )
+
+        # Save queue state
+        self._conn.execute(
+            """
+            UPDATE queue_state SET
+                current_index = ?,
+                shuffle_mode = ?,
+                repeat_mode = ?,
+                updated_at = ?
+            WHERE id = 1
+            """,
+            (current_index, int(shuffle_mode), repeat_mode, datetime.now()),
+        )
+
+        self._conn.commit()
+
+    def load_queue(self) -> tuple[list[dict], int, bool, str]:
+        """
+        Load the saved queue from database.
+
+        Returns:
+            Tuple of (items, current_index, shuffle_mode, repeat_mode)
+            items is a list of dicts with video_id, title, channel, duration, playback_position
+        """
+        items = []
+
+        # Load queue items
+        cursor = self._conn.execute(
+            """
+            SELECT q.position, q.playback_position, t.video_id, t.title, t.channel, t.duration
+            FROM queue q
+            JOIN tracks t ON t.id = q.track_id
+            ORDER BY q.position
+            """
+        )
+
+        for row in cursor.fetchall():
+            items.append({
+                "video_id": row["video_id"],
+                "title": row["title"],
+                "channel": row["channel"],
+                "duration": row["duration"],
+                "playback_position": row["playback_position"],
+            })
+
+        # Load queue state
+        cursor = self._conn.execute(
+            "SELECT current_index, shuffle_mode, repeat_mode FROM queue_state WHERE id = 1"
+        )
+        row = cursor.fetchone()
+
+        if row:
+            current_index = row["current_index"]
+            shuffle_mode = bool(row["shuffle_mode"])
+            repeat_mode = row["repeat_mode"]
+        else:
+            current_index = -1
+            shuffle_mode = False
+            repeat_mode = "none"
+
+        return items, current_index, shuffle_mode, repeat_mode
+
+    def update_queue_item_position(self, video_id: str, playback_position: int) -> None:
+        """Update the playback position for a queue item."""
+        self._conn.execute(
+            """
+            UPDATE queue SET playback_position = ?
+            WHERE track_id = (SELECT id FROM tracks WHERE video_id = ?)
+            """,
+            (playback_position, video_id),
+        )
+        self._conn.commit()
+
+    def clear_queue(self) -> None:
+        """Clear the saved queue."""
+        self._conn.execute("DELETE FROM queue")
+        self._conn.execute(
+            "UPDATE queue_state SET current_index = -1, updated_at = ? WHERE id = 1",
+            (datetime.now(),),
+        )
+        self._conn.commit()

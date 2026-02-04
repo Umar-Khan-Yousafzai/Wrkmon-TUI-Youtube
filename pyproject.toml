@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wrkmon"
-version = "1.1.0"
+version = "1.2.0"
 description = "Stealth TUI YouTube audio player - stream music while looking productive"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -34,7 +34,10 @@ dependencies = [
     "yt-dlp>=2025.1.0",
     "rich>=13.0.0",
     "packaging>=21.0",
+    "Pillow>=9.0.0",
     "pywin32>=306; sys_platform == 'win32'",
+    "dbus-next>=0.2.3; sys_platform == 'linux'",
+    "pynput>=1.7.6; sys_platform == 'win32' or sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]

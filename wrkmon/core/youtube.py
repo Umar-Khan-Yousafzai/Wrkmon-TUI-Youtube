@@ -176,3 +176,105 @@ class YouTubeClient:
                 )
         except Exception:
             return None
+
+    async def get_trending_music(self, max_results: int = 10) -> list[SearchResult]:
+        """Get trending/popular music videos."""
+        return await asyncio.to_thread(self._get_trending_sync, max_results)
+
+    def _get_trending_sync(self, max_results: int) -> list[SearchResult]:
+        """Fetch trending music from YouTube Music charts or popular searches."""
+        results = []
+
+        # Try to get from YouTube Music trending/charts
+        trending_queries = [
+            "https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",  # Popular Music
+            "https://www.youtube.com/playlist?list=PL4fGSI1pDJn6puJdseH2Rt9sMvt9E2M4i",  # Trending Music
+        ]
+
+        opts = {
+            **self._search_opts,
+            "playlistend": max_results,
+            "extract_flat": True,
+        }
+
+        # Try playlist first
+        for playlist_url in trending_queries:
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(playlist_url, download=False)
+
+                    if info and "entries" in info:
+                        for entry in info["entries"][:max_results]:
+                            if entry is None:
+                                continue
+                            result = SearchResult(
+                                video_id=entry.get("id", ""),
+                                title=entry.get("title", "Unknown"),
+                                channel=entry.get("channel", entry.get("uploader", "Unknown")),
+                                duration=entry.get("duration", 0) or 0,
+                                view_count=entry.get("view_count", 0) or 0,
+                                thumbnail_url=entry.get("thumbnail"),
+                            )
+                            if result.video_id:
+                                results.append(result)
+
+                        if results:
+                            return results[:max_results]
+            except Exception:
+                continue
+
+        # Fallback: search for popular music
+        fallback_searches = [
+            "popular music 2024",
+            "trending songs",
+            "top hits music",
+        ]
+
+        for query in fallback_searches:
+            try:
+                search_results = self._search_sync(query, max_results)
+                if search_results:
+                    return search_results
+            except Exception:
+                continue
+
+        return results
+
+    async def get_recommendations(self, video_id: str, max_results: int = 5) -> list[SearchResult]:
+        """Get recommended videos based on a video (related videos)."""
+        return await asyncio.to_thread(self._get_recommendations_sync, video_id, max_results)
+
+    def _get_recommendations_sync(self, video_id: str, max_results: int) -> list[SearchResult]:
+        """Get related/recommended videos."""
+        results = []
+        url = f"https://www.youtube.com/watch?v={video_id}"
+
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": False,
+            "noplaylist": True,
+        }
+
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+                if info and "related_videos" in info:
+                    for entry in info["related_videos"][:max_results]:
+                        if entry is None:
+                            continue
+                        result = SearchResult(
+                            video_id=entry.get("id", ""),
+                            title=entry.get("title", "Unknown"),
+                            channel=entry.get("channel", entry.get("uploader", "Unknown")),
+                            duration=entry.get("duration", 0) or 0,
+                            view_count=entry.get("view_count", 0) or 0,
+                            thumbnail_url=entry.get("thumbnail"),
+                        )
+                        if result.video_id:
+                            results.append(result)
+        except Exception:
+            pass
+
+        return results

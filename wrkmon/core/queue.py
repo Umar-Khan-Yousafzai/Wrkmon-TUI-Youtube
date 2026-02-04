@@ -16,6 +16,7 @@ class QueueItem:
     channel: str
     duration: int
     added_at: float = 0.0
+    playback_position: int = 0  # Last played position in seconds
 
     @classmethod
     def from_search_result(cls, result: SearchResult) -> "QueueItem":
@@ -28,7 +29,33 @@ class QueueItem:
             channel=result.channel,
             duration=result.duration,
             added_at=time.time(),
+            playback_position=0,
         )
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "QueueItem":
+        """Create a queue item from a dictionary."""
+        import time
+
+        return cls(
+            video_id=data["video_id"],
+            title=data["title"],
+            channel=data["channel"],
+            duration=data["duration"],
+            added_at=data.get("added_at", time.time()),
+            playback_position=data.get("playback_position", 0),
+        )
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization."""
+        return {
+            "video_id": self.video_id,
+            "title": self.title,
+            "channel": self.channel,
+            "duration": self.duration,
+            "added_at": self.added_at,
+            "playback_position": self.playback_position,
+        }
 
     @property
     def url(self) -> str:
@@ -262,3 +289,31 @@ class PlayQueue:
         if self.shuffle_mode and self._shuffle_order:
             return [self.items[i] for i in self._shuffle_order]
         return list(self.items)
+
+    def update_playback_position(self, video_id: str, position: int) -> None:
+        """Update the playback position for a queue item."""
+        for item in self.items:
+            if item.video_id == video_id:
+                item.playback_position = position
+                break
+
+    def get_playback_position(self, video_id: str) -> int:
+        """Get the saved playback position for a queue item."""
+        for item in self.items:
+            if item.video_id == video_id:
+                return item.playback_position
+        return 0
+
+    def to_dict_list(self) -> list[dict]:
+        """Convert all items to list of dicts for serialization."""
+        return [item.to_dict() for item in self.items]
+
+    def load_from_dicts(self, items: list[dict], current_index: int = -1) -> None:
+        """Load queue from list of dicts."""
+        self.clear()
+        for data in items:
+            item = QueueItem.from_dict(data)
+            self.items.append(item)
+        self.current_index = current_index if -1 <= current_index < len(self.items) else -1
+        if self.shuffle_mode:
+            self._create_shuffle_order()

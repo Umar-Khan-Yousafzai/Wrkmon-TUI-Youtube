@@ -22,7 +22,8 @@ class Config:
         "general": {
             "volume": 80,
             "shuffle": False,
-            "repeat": False,
+            "repeat_mode": "none",  # none, one, all
+            "show_trending_on_start": True,
         },
         "player": {
             "mpv_path": "mpv",
@@ -34,8 +35,11 @@ class Config:
             "max_entries": 1000,
         },
         "ui": {
-            "theme": "matrix",  # matrix, minimal, hacker
+            "theme": "github_dark",  # github_dark, matrix, dracula, nord
             "show_fake_stats": True,
+            "show_thumbnails": True,
+            "thumbnail_style": "colored_blocks",  # colored_blocks, colored_simple, braille, blocks
+            "thumbnail_width": 45,
         },
     }
 
@@ -70,7 +74,9 @@ class Config:
 
     def _load(self) -> None:
         """Load configuration from file."""
-        self._config = self.DEFAULT_CONFIG.copy()
+        # Deep copy default config
+        import copy
+        self._config = copy.deepcopy(self.DEFAULT_CONFIG)
 
         if self._config_file.exists() and tomllib is not None:
             try:
@@ -134,6 +140,7 @@ class Config:
         """Get cache file path."""
         return self._data_dir / "cache.db"
 
+    # General settings
     @property
     def volume(self) -> int:
         """Get current volume setting."""
@@ -145,19 +152,93 @@ class Config:
         self.set("general", "volume", max(0, min(100, value)))
 
     @property
+    def repeat_mode(self) -> str:
+        """Get repeat mode (none, one, all)."""
+        return self.get("general", "repeat_mode", "none")
+
+    @repeat_mode.setter
+    def repeat_mode(self, value: str) -> None:
+        """Set repeat mode."""
+        if value in ("none", "one", "all"):
+            self.set("general", "repeat_mode", value)
+
+    @property
+    def shuffle(self) -> bool:
+        """Get shuffle setting."""
+        return self.get("general", "shuffle", False)
+
+    @shuffle.setter
+    def shuffle(self, value: bool) -> None:
+        """Set shuffle."""
+        self.set("general", "shuffle", value)
+
+    @property
+    def show_trending_on_start(self) -> bool:
+        """Whether to show trending videos on startup."""
+        return self.get("general", "show_trending_on_start", True)
+
+    @show_trending_on_start.setter
+    def show_trending_on_start(self, value: bool) -> None:
+        """Set show trending on start."""
+        self.set("general", "show_trending_on_start", value)
+
+    # Player settings
+    @property
     def mpv_path(self) -> str:
         """Get mpv executable path."""
         from wrkmon.utils.mpv_installer import get_mpv_path
         configured = self.get("player", "mpv_path", "mpv")
         if configured != "mpv":
             return configured
-        # Auto-detect mpv location
         return get_mpv_path()
 
+    # Cache settings
     @property
     def url_ttl_hours(self) -> int:
         """Get URL cache TTL in hours."""
         return self.get("cache", "url_ttl_hours", 6)
+
+    # UI settings
+    @property
+    def theme(self) -> str:
+        """Get UI theme."""
+        return self.get("ui", "theme", "github_dark")
+
+    @theme.setter
+    def theme(self, value: str) -> None:
+        """Set UI theme."""
+        self.set("ui", "theme", value)
+
+    @property
+    def show_thumbnails(self) -> bool:
+        """Whether to show thumbnails."""
+        return self.get("ui", "show_thumbnails", True)
+
+    @show_thumbnails.setter
+    def show_thumbnails(self, value: bool) -> None:
+        """Set show thumbnails."""
+        self.set("ui", "show_thumbnails", value)
+
+    @property
+    def thumbnail_style(self) -> str:
+        """Get thumbnail rendering style."""
+        return self.get("ui", "thumbnail_style", "colored_blocks")
+
+    @thumbnail_style.setter
+    def thumbnail_style(self, value: str) -> None:
+        """Set thumbnail style."""
+        if value in ("colored_blocks", "colored_simple", "braille", "blocks"):
+            self.set("ui", "thumbnail_style", value)
+
+    @property
+    def thumbnail_width(self) -> int:
+        """Get thumbnail width in characters."""
+        return self.get("ui", "thumbnail_width", 45)
+
+    @thumbnail_width.setter
+    def thumbnail_width(self, value: int) -> None:
+        """Set thumbnail width."""
+        self.set("ui", "thumbnail_width", max(20, min(80, value)))
 
 
 # Global config instance

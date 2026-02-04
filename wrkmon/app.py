@@ -4,6 +4,7 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Setup logging to file
 log_path = Path.home() / ".wrkmon_debug.log"
@@ -42,12 +43,14 @@ from wrkmon.ui.messages import (
     StatusMessage,
     PlaybackStateChanged,
 )
+from wrkmon.ui.screens.help import HelpScreen
 from wrkmon.utils.updater import (
     check_for_updates_async,
     check_dependencies,
     get_js_runtime,
     install_deno_async,
 )
+from wrkmon.core.media_keys import get_media_keys_handler, MediaKeysHandler
 
 
 class WrkmonApp(App):
@@ -63,12 +66,12 @@ class WrkmonApp(App):
         Binding("f3", "switch_view('history')", "History", show=True, priority=True),
         Binding("f4", "switch_view('playlists')", "Lists", show=True, priority=True),
         # Playback controls (global)
-        Binding("f5", "toggle_pause", "Play/Pause", show=True, priority=True),
+        Binding("f5", "toggle_pause", "▶/⏸", show=True, priority=True),
         Binding("f6", "volume_down", "Vol-", show=True, priority=True),
         Binding("f7", "volume_up", "Vol+", show=True, priority=True),
         Binding("f8", "next_track", "Next", show=True, priority=True),
         Binding("f9", "stop", "Stop", show=True, priority=True),
-        Binding("f10", "queue_current", "Queue", show=True, priority=True),
+        Binding("f10", "queue_current", "+Queue", show=True, priority=True),
         # Additional controls (when not in input)
         Binding("space", "toggle_pause", "Play/Pause", show=False),
         Binding("+", "volume_up", "Vol+", show=False),
@@ -77,6 +80,14 @@ class WrkmonApp(App):
         Binding("n", "next_track", "Next", show=False),
         Binding("p", "prev_track", "Prev", show=False),
         Binding("s", "stop", "Stop", show=False),
+        Binding("m", "toggle_mute", "Mute", show=False),
+        # Vim-style navigation
+        Binding("j", "cursor_down", "Down", show=False),
+        Binding("k", "cursor_up", "Up", show=False),
+        Binding("g", "cursor_top", "Top", show=False),
+        Binding("G", "cursor_bottom", "Bottom", show=False, key_display="shift+g"),
+        # Help
+        Binding("?", "show_help", "Help", show=True, priority=True),
         # App controls
         Binding("escape", "focus_search", "Back", show=False, priority=True),
         Binding("ctrl+c", "quit", "Quit", show=False, priority=True),
@@ -101,6 +112,13 @@ class WrkmonApp(App):
         self._volume = self._config.volume
         self._current_track: SearchResult | None = None
         self._current_view = "search"
+
+        # Restore playback settings from config
+        self.queue.repeat_mode = self._config.repeat_mode
+        self.queue.shuffle_mode = self._config.shuffle
+
+        # Media keys handler (for Fn+media buttons)
+        self._media_keys: Optional[MediaKeysHandler] = None
 
     def compose(self) -> ComposeResult:
         """Compose the application layout."""
@@ -174,6 +192,49 @@ class WrkmonApp(App):
         # Update header view indicator
         self._get_header().set_view_name("search")
 
+        # Start media keys handler (for Fn+Play/Pause, Next, Previous)
+        await self._start_media_keys()
+
+        # Load saved queue
+        self._load_saved_queue()
+
+    def _load_saved_queue(self) -> None:
+        """Load the saved queue from database."""
+        try:
+            items, current_index, shuffle_mode, repeat_mode = self.database.load_queue()
+            if items:
+                self.queue.load_from_dicts(items, current_index)
+                self.queue.shuffle_mode = shuffle_mode
+                self.queue.repeat_mode = repeat_mode
+                logger.info(f"Loaded {len(items)} items from saved queue, index={current_index}")
+
+                # Show notification about restored queue
+                if len(items) > 0:
+                    current = self.queue.current
+                    if current:
+                        pos_str = f" @ {current.playback_position // 60}:{current.playback_position % 60:02d}" if current.playback_position > 0 else ""
+                        self.notify(
+                            f"Queue restored: {len(items)} tracks\n"
+                            f"Current: {current.title[:30]}...{pos_str}",
+                            timeout=4
+                        )
+        except Exception as e:
+            logger.debug(f"Failed to load saved queue: {e}")
+
+    def _save_queue(self) -> None:
+        """Save the current queue to database."""
+        try:
+            items = self.queue.to_dict_list()
+            self.database.save_queue(
+                items=items,
+                current_index=self.queue.current_index,
+                shuffle_mode=self.queue.shuffle_mode,
+                repeat_mode=self.queue.repeat_mode,
+            )
+            logger.info(f"Saved {len(items)} items to queue")
+        except Exception as e:
+            logger.debug(f"Failed to save queue: {e}")
+
     async def _check_for_updates(self) -> None:
         """Check for updates in background."""
         try:
@@ -208,6 +269,56 @@ class WrkmonApp(App):
                 logger.info("No JavaScript runtime found, suggesting deno installation")
         except Exception as e:
             logger.debug(f"Dependency check failed: {e}")
+
+    async def _start_media_keys(self) -> None:
+        """Start media keys handler for Fn+media buttons."""
+        try:
+            self._media_keys = get_media_keys_handler(self._handle_media_key)
+            if self._media_keys and self._media_keys.is_available:
+                started = await self._media_keys.start()
+                if started:
+                    logger.info(f"Media keys enabled via {self._media_keys.backend_name}")
+                    self.notify(
+                        f"Media keys active ({self._media_keys.backend_name})",
+                        timeout=3
+                    )
+                else:
+                    logger.info("Media keys handler failed to start")
+            else:
+                logger.info("Media keys not available on this platform")
+        except Exception as e:
+            logger.debug(f"Failed to start media keys: {e}")
+
+    async def _handle_media_key(self, command: str, *args) -> None:
+        """Handle media key commands from OS."""
+        logger.info(f"Media key: {command} {args}")
+        try:
+            if command == "play_pause":
+                await self.action_toggle_pause()
+            elif command == "play":
+                if not self.player.is_playing:
+                    await self.action_toggle_pause()
+            elif command == "pause":
+                if self.player.is_playing:
+                    await self.toggle_pause()
+            elif command == "stop":
+                await self.action_stop()
+            elif command == "next":
+                await self.action_next_track()
+            elif command == "previous":
+                await self.action_prev_track()
+            elif command == "volume_up":
+                await self.action_volume_up()
+            elif command == "volume_down":
+                await self.action_volume_down()
+            elif command == "mute":
+                await self.action_toggle_mute()
+            elif command == "set_volume" and args:
+                await self.set_volume(args[0])
+            elif command == "quit":
+                await self.action_quit()
+        except Exception as e:
+            logger.error(f"Error handling media key {command}: {e}")
 
     # ----------------------------------------
     # Component getters
@@ -306,7 +417,27 @@ class WrkmonApp(App):
 
         if success:
             logger.info("  SUCCESS - audio should be playing!")
+
+            # Check if we should resume from a saved position
+            saved_position = self.queue.get_playback_position(result.video_id)
+            if saved_position > 5:  # Only resume if > 5 seconds in
+                logger.info(f"  Resuming from saved position: {saved_position}s")
+                player_bar.update_playback(title=f"Resuming: {result.title[:30]}...")
+                await asyncio.sleep(0.5)  # Give mpv time to load
+                await self.player.seek(saved_position, relative=False)  # Absolute seek
+
             player_bar.update_playback(title=result.title, is_playing=True)
+
+            # Update media keys metadata (for MPRIS/system media controls)
+            if self._media_keys:
+                self._media_keys.update_track(
+                    title=result.title,
+                    artist=result.channel,
+                    duration=result.duration,
+                    art_url=result.thumbnail_url or "",
+                    track_id=result.video_id,
+                )
+                self._media_keys.update_playback(is_playing=True)
 
             # Add to history
             track = self.database.get_or_create_track(
@@ -401,6 +532,18 @@ class WrkmonApp(App):
                 duration=dur,
                 is_playing=is_playing,
             )
+
+            # Save playback position every 10 seconds (to reduce DB writes)
+            if is_playing and int(pos) % 10 == 0 and int(pos) > 0:
+                self.queue.update_playback_position(self._current_track.video_id, int(pos))
+
+            # Update media keys state (for MPRIS seekbar, etc.)
+            if self._media_keys:
+                self._media_keys.update_playback(
+                    is_playing=is_playing,
+                    position=pos,
+                    volume=self._volume,
+                )
 
             # Update queue view if visible
             if self._current_view == "queue":
@@ -573,6 +716,89 @@ class WrkmonApp(App):
         except Exception:
             pass
 
+    def action_show_help(self) -> None:
+        """Show the help screen."""
+        self.push_screen(HelpScreen())
+
+    async def action_toggle_mute(self) -> None:
+        """Toggle mute."""
+        if not hasattr(self, '_muted'):
+            self._muted = False
+            self._pre_mute_volume = self._volume
+
+        if self._muted:
+            # Unmute - restore previous volume
+            await self.set_volume(self._pre_mute_volume)
+            self._muted = False
+            self.notify("Unmuted", timeout=1)
+        else:
+            # Mute - save current volume and set to 0
+            self._pre_mute_volume = self._volume
+            await self.set_volume(0)
+            self._muted = True
+            self.notify("Muted", timeout=1)
+
+    def action_cursor_down(self) -> None:
+        """Move cursor down in current list (vim j key)."""
+        self._navigate_list(1)
+
+    def action_cursor_up(self) -> None:
+        """Move cursor up in current list (vim k key)."""
+        self._navigate_list(-1)
+
+    def action_cursor_top(self) -> None:
+        """Jump to top of current list (vim g key)."""
+        self._navigate_list_to(0)
+
+    def action_cursor_bottom(self) -> None:
+        """Jump to bottom of current list (vim G key)."""
+        self._navigate_list_to(-1)
+
+    def _navigate_list(self, delta: int) -> None:
+        """Navigate in the current view's list."""
+        try:
+            if self._current_view == "search":
+                list_view = self.query_one("#results-list")
+            elif self._current_view == "queue":
+                list_view = self.query_one("#queue-list")
+            elif self._current_view == "history":
+                list_view = self.query_one("#history-list")
+            elif self._current_view == "playlists":
+                list_view = self.query_one("#playlist-list")
+            else:
+                return
+
+            if list_view and hasattr(list_view, 'index'):
+                new_index = max(0, list_view.index + delta)
+                if hasattr(list_view, 'children'):
+                    new_index = min(new_index, len(list_view.children) - 1)
+                list_view.index = new_index
+        except Exception:
+            pass
+
+    def _navigate_list_to(self, index: int) -> None:
+        """Navigate to specific index in current list."""
+        try:
+            if self._current_view == "search":
+                list_view = self.query_one("#results-list")
+            elif self._current_view == "queue":
+                list_view = self.query_one("#queue-list")
+            elif self._current_view == "history":
+                list_view = self.query_one("#history-list")
+            elif self._current_view == "playlists":
+                list_view = self.query_one("#playlist-list")
+            else:
+                return
+
+            if list_view and hasattr(list_view, 'index'):
+                if index == -1 and hasattr(list_view, 'children'):
+                    # Go to last item
+                    list_view.index = max(0, len(list_view.children) - 1)
+                else:
+                    list_view.index = index
+        except Exception:
+            pass
+
     async def action_quit(self) -> None:
         """Quit the application cleanly."""
         await self._cleanup()
@@ -581,9 +807,29 @@ class WrkmonApp(App):
     async def _cleanup(self) -> None:
         """Clean up resources."""
         logger.info("=== Cleaning up ===")
-        # Save config
+
+        # Save current playback position before cleanup
+        if self._current_track:
+            try:
+                pos = await self.player.get_position()
+                self.queue.update_playback_position(self._current_track.video_id, int(pos))
+                logger.info(f"  Saved position {int(pos)}s for {self._current_track.title[:30]}")
+            except Exception:
+                pass
+
+        # Save queue to database
+        self._save_queue()
+
+        # Save all settings to config
         self._config.volume = self._volume
+        self._config.repeat_mode = self.queue.repeat_mode
+        self._config.shuffle = self.queue.shuffle_mode
         self._config.save()
+        logger.info(f"  Saved settings: vol={self._volume}, repeat={self.queue.repeat_mode}, shuffle={self.queue.shuffle_mode}")
+
+        # Stop media keys handler
+        if self._media_keys:
+            await self._media_keys.stop()
 
         # Shutdown player - MUST stop mpv
         logger.info("  Stopping player...")

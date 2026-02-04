@@ -18,6 +18,8 @@ class PlayerBar(Static):
     duration = reactive(0.0)
     volume = reactive(80)
     status_text = reactive("")  # For showing errors/buffering
+    repeat_mode = reactive("none")  # none, one, all
+    is_muted = reactive(False)
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -30,6 +32,7 @@ class PlayerBar(Static):
                 yield Static("NOW", id="now-label", classes="label")
                 yield Static(self._get_status_icon(), id="play-status")
                 yield Static(self.title, id="track-title")
+                yield Static("", id="repeat-indicator")
 
             # Progress row
             with Horizontal(id="progress-row"):
@@ -44,7 +47,15 @@ class PlayerBar(Static):
                 yield Static(f"{self.volume}%", id="vol-value")
 
     def _get_status_icon(self) -> str:
-        return "▶" if self.is_playing else "■"
+        """Get status icon with color markup."""
+        if self.is_playing:
+            return "[bold green]▶[/]"
+        else:
+            return "[bold orange1]⏸[/]"
+
+    def _get_status_text(self) -> str:
+        """Get status text for stopped state."""
+        return "[dim]■[/]"
 
     def _format_time(self, seconds: float) -> str:
         return self._stealth.format_duration(seconds)
@@ -57,21 +68,32 @@ class PlayerBar(Static):
         """Update title display."""
         try:
             display_title = self._format_title(new_title) if new_title else "No process running"
-            self.query_one("#track-title", Static).update(display_title)
+            title_widget = self.query_one("#track-title", Static)
+            title_widget.update(display_title)
         except Exception:
             pass
 
     def watch_is_playing(self) -> None:
         """Update play/pause icon."""
         try:
-            self.query_one("#play-status", Static).update(self._get_status_icon())
+            status_widget = self.query_one("#play-status", Static)
+            status_widget.update(self._get_status_icon())
+
+            # Update CSS classes for styling
+            if self.is_playing:
+                status_widget.remove_class("paused")
+                status_widget.remove_class("stopped")
+            else:
+                status_widget.add_class("paused")
         except Exception:
             pass
 
     def watch_position(self, new_pos: float) -> None:
         """Update progress bar and time."""
         try:
-            self.query_one("#time-current", Static).update(self._format_time(new_pos))
+            time_widget = self.query_one("#time-current", Static)
+            time_widget.update(self._format_time(new_pos))
+
             if self.duration > 0:
                 progress = (new_pos / self.duration) * 100
                 self.query_one("#progress", ProgressBar).update(progress=progress)
@@ -89,7 +111,28 @@ class PlayerBar(Static):
         """Update volume display."""
         try:
             self.query_one("#volume", ProgressBar).update(progress=new_vol)
-            self.query_one("#vol-value", Static).update(f"{new_vol}%")
+            vol_text = f"{new_vol}%" if not self.is_muted else "[red]MUTE[/]"
+            self.query_one("#vol-value", Static).update(vol_text)
+        except Exception:
+            pass
+
+    def watch_is_muted(self, is_muted: bool) -> None:
+        """Update mute indicator."""
+        try:
+            vol_text = f"{self.volume}%" if not is_muted else "[red]MUTE[/]"
+            self.query_one("#vol-value", Static).update(vol_text)
+        except Exception:
+            pass
+
+    def watch_repeat_mode(self, new_mode: str) -> None:
+        """Update repeat indicator."""
+        try:
+            indicator = ""
+            if new_mode == "one":
+                indicator = "[bold purple]⟳1[/]"
+            elif new_mode == "all":
+                indicator = "[bold purple]⟳∞[/]"
+            self.query_one("#repeat-indicator", Static).update(indicator)
         except Exception:
             pass
 
@@ -113,3 +156,7 @@ class PlayerBar(Static):
     def set_volume(self, volume: int) -> None:
         """Update volume display."""
         self.volume = max(0, min(100, volume))
+
+    def set_muted(self, muted: bool) -> None:
+        """Update mute state."""
+        self.is_muted = muted

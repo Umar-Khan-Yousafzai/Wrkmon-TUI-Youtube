@@ -1,11 +1,12 @@
 #!/bin/bash
 # wrkmon installer - Cross-platform installation script
-# Usage: curl -sSL https://raw.githubusercontent.com/Umar-Khan-Yousafzai/Wrkmon-TUI-Youtube/main/install.sh | bash
+# Usage: curl -sSL https://raw.githubusercontent.com/ionkhan-yousafzai/wrkmon/main/install.sh | bash
+#   or:  wget -qO- https://raw.githubusercontent.com/ionkhan-yousafzai/wrkmon/main/install.sh | bash
 
 set -e
 
 echo "=================================="
-echo "  wrkmon Installer v1.1.0"
+echo "  wrkmon Installer v1.2.0"
 echo "=================================="
 echo ""
 
