@@ -4,7 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "==================================" -ForegroundColor Cyan
-Write-Host "  wrkmon Installer v1.3.0" -ForegroundColor Cyan
+Write-Host "  wrkmon Installer v1.3.1" -ForegroundColor Cyan
 Write-Host "==================================" -ForegroundColor Cyan
 Write-Host ""
 

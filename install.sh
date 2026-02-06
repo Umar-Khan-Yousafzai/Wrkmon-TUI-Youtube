@@ -5,7 +5,7 @@
 
 set -euo pipefail
 
-VERSION="1.3.0"
+VERSION="1.3.1"
 
 # Colors (safe for non-color terminals)
 if [ -t 1 ] && command -v tput >/dev/null 2>&1; then

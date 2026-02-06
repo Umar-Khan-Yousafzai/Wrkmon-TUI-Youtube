@@ -99,6 +99,7 @@ class WrkmonApp(App):
         Binding("k", "cursor_up", "Up", show=False),
         Binding("g", "cursor_top", "Top", show=False),
         Binding("G", "cursor_bottom", "Bottom", show=False, key_display="shift+g"),
+        Binding("r", "cycle_repeat", "Repeat", show=False),
         # New features
         Binding("b", "focus_mode", "Focus", show=False),
         Binding("l", "show_lyrics", "Lyrics", show=False),
@@ -140,6 +141,7 @@ class WrkmonApp(App):
         self._current_view = "search"
         self._autoplay = self._config.autoplay
         self._playback_speed = self._config.playback_speed
+        self._track_ended = False  # Guard to prevent repeated end-of-track triggers
 
         # Restore playback settings from config
         self.queue.repeat_mode = self._config.repeat_mode
@@ -452,14 +454,20 @@ class WrkmonApp(App):
 
         if success:
             logger.info("  SUCCESS - audio should be playing!")
+            self._track_ended = False  # Reset end-of-track guard
 
             # Check if we should resume from a saved position
             saved_position = self.queue.get_playback_position(result.video_id)
-            if saved_position > 5:  # Only resume if > 5 seconds in
+            dur = result.duration
+            # Only resume if position is meaningful (>5s in) and NOT near the end
+            if saved_position > 5 and (dur == 0 or saved_position < dur - 5):
                 logger.info(f"  Resuming from saved position: {saved_position}s")
                 player_bar.update_playback(title=f"Resuming: {result.title[:30]}...")
                 await asyncio.sleep(0.5)  # Give mpv time to load
                 await self.player.seek(saved_position, relative=False)  # Absolute seek
+            else:
+                # Reset saved position so replayed tracks start fresh
+                self.queue.update_playback_position(result.video_id, 0)
 
             player_bar.update_playback(title=result.title, is_playing=True)
 
@@ -600,8 +608,9 @@ class WrkmonApp(App):
                     self._current_track.title, pos, dur
                 )
 
-            # Check if track ended
-            if dur > 0 and pos >= dur - 1:
+            # Check if track ended (with guard to prevent repeated triggers)
+            if dur > 0 and pos >= dur - 1 and not self._track_ended:
+                self._track_ended = True
                 await self._on_track_end()
 
         except Exception:
@@ -822,6 +831,13 @@ class WrkmonApp(App):
     # ----------------------------------------
     # New feature actions
     # ----------------------------------------
+    def action_cycle_repeat(self) -> None:
+        """Cycle repeat mode: none -> one -> all."""
+        mode = self.queue.cycle_repeat()
+        labels = {"none": "OFF", "one": "ONE", "all": "ALL"}
+        self.notify(f"Repeat: {labels.get(mode, mode)}", timeout=2)
+        self._get_player_bar().repeat_mode = mode
+
     def action_focus_mode(self) -> None:
         """Show the focus mode screen."""
         self.push_screen(FocusScreen())
