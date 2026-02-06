@@ -2,9 +2,11 @@
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
+from textual.events import Click
 from textual.reactive import reactive
 from textual.widgets import Static, ProgressBar
 
+from wrkmon.ui.messages import SeekRequested
 from wrkmon.utils.stealth import get_stealth
 
 
@@ -160,3 +162,18 @@ class PlayerBar(Static):
     def set_muted(self, muted: bool) -> None:
         """Update mute state."""
         self.is_muted = muted
+
+    def on_click(self, event: Click) -> None:
+        """Handle click on the progress bar to seek."""
+        try:
+            progress_bar = self.query_one("#progress", ProgressBar)
+            # Check if the click is within the progress bar's region
+            region = progress_bar.region
+            if region.contains(event.screen_x, event.screen_y) and self.duration > 0:
+                # Calculate the seek position based on click X relative to the bar
+                relative_x = event.screen_x - region.x
+                fraction = max(0.0, min(1.0, relative_x / region.width))
+                seek_to = fraction * self.duration
+                self.post_message(SeekRequested(position=seek_to))
+        except Exception:
+            pass

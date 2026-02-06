@@ -51,6 +51,7 @@ from wrkmon.ui.messages import (
     SleepTimerSet,
     AutoplayToggled,
     AddToPlaylist,
+    SeekRequested,
 )
 from wrkmon.ui.screens.help import HelpScreen
 from wrkmon.ui.screens.lyrics import LyricsScreen
@@ -391,6 +392,12 @@ class WrkmonApp(App):
         """Handle status messages (could show in a notification area)."""
         # For now, just log or ignore
         pass
+
+    async def on_seek_requested(self, message: SeekRequested) -> None:
+        """Handle click-to-seek on the progress bar."""
+        if self.player.is_connected and self._current_track:
+            await self.player.seek(message.position, relative=False)
+            self._get_player_bar().update_playback(position=message.position)
 
     # ----------------------------------------
     # Playback methods

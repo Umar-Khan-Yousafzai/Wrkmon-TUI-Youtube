@@ -129,3 +129,11 @@ class AddToPlaylist(Message):
         self.result = result
         self.playlist_id = playlist_id
         super().__init__()
+
+
+class SeekRequested(Message):
+    """Emitted when user clicks on the seek bar to jump to a position."""
+
+    def __init__(self, position: float) -> None:
+        self.position = position  # Target position in seconds
+        super().__init__()
