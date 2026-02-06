@@ -1,9 +1,13 @@
 """YouTube integration using yt-dlp."""
 
 import asyncio
+import logging
+import re
 from dataclasses import dataclass
 from typing import Optional
 import yt_dlp
+
+logger = logging.getLogger("wrkmon.youtube")
 
 
 @dataclass
@@ -92,8 +96,8 @@ class YouTubeClient:
                             thumbnail_url=entry.get("thumbnail"),
                         )
                         results.append(result)
-        except Exception:
-            pass  # Return empty results on error
+        except Exception as e:
+            logger.error(f"Search failed for '{query}': {e}")
 
         return results
 
@@ -102,9 +106,23 @@ class YouTubeClient:
         return await asyncio.to_thread(self._get_stream_sync, video_id)
 
     def _get_stream_sync(self, video_id: str) -> Optional[StreamInfo]:
-        """Synchronous stream extraction."""
+        """Synchronous stream extraction with retry."""
         url = f"https://www.youtube.com/watch?v={video_id}"
+        max_retries = 3
 
+        for attempt in range(max_retries):
+            try:
+                return self._extract_stream(url, video_id)
+            except Exception as e:
+                logger.warning(f"Stream extraction attempt {attempt + 1}/{max_retries} failed for {video_id}: {e}")
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(1.0 * (attempt + 1))  # Backoff
+        logger.error(f"All {max_retries} attempts failed for {video_id}")
+        return None
+
+    def _extract_stream(self, url: str, video_id: str) -> Optional[StreamInfo]:
+        """Single attempt at stream extraction."""
         try:
             with yt_dlp.YoutubeDL(self._extract_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -144,8 +162,55 @@ class YouTubeClient:
                     channel=info.get("channel", info.get("uploader", "Unknown")),
                     thumbnail_url=info.get("thumbnail"),
                 )
-        except Exception:
+        except Exception as e:
+            logger.error(f"Stream extraction error for {video_id}: {e}")
             return None
+
+    async def extract_playlist(self, playlist_url: str, max_results: int = 50) -> list[SearchResult]:
+        """Extract tracks from a YouTube playlist URL."""
+        return await asyncio.to_thread(self._extract_playlist_sync, playlist_url, max_results)
+
+    def _extract_playlist_sync(self, playlist_url: str, max_results: int) -> list[SearchResult]:
+        """Synchronous playlist extraction."""
+        results = []
+        opts = {
+            **self._search_opts,
+            "playlistend": max_results,
+            "extract_flat": True,
+        }
+
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(playlist_url, download=False)
+
+                if info and "entries" in info:
+                    for entry in info["entries"][:max_results]:
+                        if entry is None:
+                            continue
+                        result = SearchResult(
+                            video_id=entry.get("id", ""),
+                            title=entry.get("title", "Unknown"),
+                            channel=entry.get("channel", entry.get("uploader", "Unknown")),
+                            duration=entry.get("duration", 0) or 0,
+                            view_count=entry.get("view_count", 0) or 0,
+                            thumbnail_url=entry.get("thumbnail"),
+                        )
+                        if result.video_id:
+                            results.append(result)
+        except Exception as e:
+            logger.error(f"Playlist extraction failed for {playlist_url}: {e}")
+
+        return results
+
+    @staticmethod
+    def is_playlist_url(url: str) -> bool:
+        """Check if a URL is a YouTube playlist."""
+        return bool(re.search(r"[?&]list=", url))
+
+    @staticmethod
+    def is_youtube_url(url: str) -> bool:
+        """Check if a string is a YouTube URL."""
+        return bool(re.search(r"(youtube\.com|youtu\.be)", url))
 
     async def get_video_info(self, video_id: str) -> Optional[SearchResult]:
         """Get video metadata without extracting stream URL."""
@@ -174,7 +239,8 @@ class YouTubeClient:
                     view_count=info.get("view_count", 0) or 0,
                     thumbnail_url=info.get("thumbnail"),
                 )
-        except Exception:
+        except Exception as e:
+            logger.error(f"Video info fetch failed for {video_id}: {e}")
             return None
 
     async def get_trending_music(self, max_results: int = 10) -> list[SearchResult]:
@@ -274,7 +340,7 @@ class YouTubeClient:
                         )
                         if result.video_id:
                             results.append(result)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Recommendations failed for {video_id}: {e}")
 
         return results

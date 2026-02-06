@@ -14,6 +14,16 @@ from wrkmon.utils.config import get_config
 logger = logging.getLogger("wrkmon.player")
 
 
+    # Equalizer presets as mpv audio filter strings
+EQUALIZER_PRESETS = {
+    "none": "",
+    "bass_boost": "equalizer=f=60:width_type=o:w=2:g=6,equalizer=f=170:width_type=o:w=2:g=4",
+    "treble": "equalizer=f=6000:width_type=o:w=2:g=5,equalizer=f=12000:width_type=o:w=2:g=4",
+    "vocal": "equalizer=f=300:width_type=o:w=2:g=3,equalizer=f=3000:width_type=o:w=2:g=5",
+    "flat": "equalizer=f=60:width_type=o:w=2:g=0,equalizer=f=6000:width_type=o:w=2:g=0",
+}
+
+
 class AudioPlayer:
     """mpv audio player with IPC for pause/resume/seek."""
 
@@ -25,6 +35,8 @@ class AudioPlayer:
         self._paused = False
         self._position = 0.0
         self._duration = 0.0
+        self._speed = 1.0
+        self._equalizer_preset = "none"
         self._pipe_path = r"\\.\pipe\wrkmon_mpv" if sys.platform == "win32" else "/tmp/wrkmon_mpv.sock"
         self._pipe = None
 
@@ -282,6 +294,28 @@ class AudioPlayer:
         """Shutdown player."""
         await self.stop()
 
+    async def set_speed(self, speed: float) -> None:
+        """Set playback speed (0.5 - 2.0)."""
+        self._speed = max(0.5, min(2.0, speed))
+        if self.is_connected:
+            await self._send_command_async(["set_property", "speed", self._speed])
+
+    async def get_speed(self) -> float:
+        """Get current playback speed."""
+        return self._speed
+
+    async def set_equalizer(self, preset: str) -> None:
+        """Apply an equalizer preset."""
+        if preset not in EQUALIZER_PRESETS:
+            return
+        self._equalizer_preset = preset
+        af_string = EQUALIZER_PRESETS[preset]
+        if self.is_connected:
+            if af_string:
+                await self._send_command_async(["set_property", "af", af_string])
+            else:
+                await self._send_command_async(["set_property", "af", ""])
+
     def on_property_change(self, name: str, callback) -> None:
         """Register callback - not implemented yet."""
         pass
@@ -298,4 +332,6 @@ class AudioPlayer:
         if name == "duration":
             await self._update_properties()
             return self._duration
+        if name == "speed":
+            return self._speed
         return None

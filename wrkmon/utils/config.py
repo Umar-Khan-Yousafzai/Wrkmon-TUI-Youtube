@@ -24,11 +24,16 @@ class Config:
             "shuffle": False,
             "repeat_mode": "none",  # none, one, all
             "show_trending_on_start": True,
+            "autoplay": False,  # Radio mode - auto-play recommendations
+            "notifications": True,  # Desktop notifications on track change
         },
         "player": {
             "mpv_path": "mpv",
             "audio_only": True,
             "no_video": True,
+            "playback_speed": 1.0,  # 0.5 - 2.0
+            "equalizer_preset": "none",  # none, bass_boost, treble, vocal, flat
+            "prefetch_next": True,  # Pre-fetch next track URL
         },
         "cache": {
             "url_ttl_hours": 6,
@@ -40,6 +45,22 @@ class Config:
             "show_thumbnails": True,
             "thumbnail_style": "colored_blocks",  # colored_blocks, colored_simple, braille, blocks
             "thumbnail_width": 45,
+        },
+        "download": {
+            "directory": "",  # Empty = ~/Music/wrkmon/
+            "format": "bestaudio",  # bestaudio, mp3, opus
+        },
+        "keybindings": {
+            "play_pause": "f5",
+            "next_track": "f8",
+            "prev_track": "p",
+            "volume_up": "f7",
+            "volume_down": "f6",
+            "stop": "f9",
+            "focus_mode": "b",
+            "lyrics": "l",
+            "speed_up": "]",
+            "speed_down": "[",
         },
     }
 
@@ -239,6 +260,75 @@ class Config:
     def thumbnail_width(self, value: int) -> None:
         """Set thumbnail width."""
         self.set("ui", "thumbnail_width", max(20, min(80, value)))
+
+    # Playback features
+    @property
+    def autoplay(self) -> bool:
+        """Whether to auto-play recommendations when queue ends."""
+        return self.get("general", "autoplay", False)
+
+    @autoplay.setter
+    def autoplay(self, value: bool) -> None:
+        self.set("general", "autoplay", value)
+
+    @property
+    def notifications_enabled(self) -> bool:
+        """Whether desktop notifications are enabled."""
+        return self.get("general", "notifications", True)
+
+    @notifications_enabled.setter
+    def notifications_enabled(self, value: bool) -> None:
+        self.set("general", "notifications", value)
+
+    @property
+    def playback_speed(self) -> float:
+        """Get playback speed (0.5 - 2.0)."""
+        return self.get("player", "playback_speed", 1.0)
+
+    @playback_speed.setter
+    def playback_speed(self, value: float) -> None:
+        self.set("player", "playback_speed", max(0.5, min(2.0, round(value, 2))))
+
+    @property
+    def equalizer_preset(self) -> str:
+        """Get equalizer preset."""
+        return self.get("player", "equalizer_preset", "none")
+
+    @equalizer_preset.setter
+    def equalizer_preset(self, value: str) -> None:
+        if value in ("none", "bass_boost", "treble", "vocal", "flat"):
+            self.set("player", "equalizer_preset", value)
+
+    @property
+    def prefetch_next(self) -> bool:
+        """Whether to pre-fetch next track URL."""
+        return self.get("player", "prefetch_next", True)
+
+    @property
+    def download_directory(self) -> Path:
+        """Get download directory."""
+        custom = self.get("download", "directory", "")
+        if custom:
+            return Path(custom)
+        return Path.home() / "Music" / "wrkmon"
+
+    @download_directory.setter
+    def download_directory(self, value: str) -> None:
+        self.set("download", "directory", value)
+
+    @property
+    def download_format(self) -> str:
+        """Get download format."""
+        return self.get("download", "format", "bestaudio")
+
+    def get_keybinding(self, action: str) -> str:
+        """Get keybinding for an action."""
+        defaults = self.DEFAULT_CONFIG.get("keybindings", {})
+        return self.get("keybindings", action, defaults.get(action, ""))
+
+    def set_keybinding(self, action: str, key: str) -> None:
+        """Set keybinding for an action."""
+        self.set("keybindings", action, key)
 
 
 # Global config instance

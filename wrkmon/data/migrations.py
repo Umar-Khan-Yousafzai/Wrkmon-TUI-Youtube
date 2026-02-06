@@ -90,6 +90,32 @@ MIGRATIONS: list[tuple[int, str, str]] = [
         INSERT OR IGNORE INTO queue_state (id) VALUES (1);
         """,
     ),
+    (
+        3,
+        "Add search history and downloads tracking",
+        """
+        -- Search history for autocomplete
+        CREATE TABLE IF NOT EXISTS search_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            query TEXT NOT NULL,
+            result_count INTEGER DEFAULT 0,
+            searched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_search_history_query ON search_history(query);
+        CREATE INDEX IF NOT EXISTS idx_search_history_searched_at ON search_history(searched_at DESC);
+
+        -- Downloads tracking
+        CREATE TABLE IF NOT EXISTS downloads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            track_id INTEGER NOT NULL,
+            file_path TEXT NOT NULL,
+            file_size INTEGER DEFAULT 0,
+            downloaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_downloads_track ON downloads(track_id);
+        """,
+    ),
 ]
 
 

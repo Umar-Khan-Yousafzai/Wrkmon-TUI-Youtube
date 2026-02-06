@@ -87,3 +87,45 @@ class StatusMessage(Message):
         self.message = message
         self.level = level  # "info", "success", "warning", "error"
         super().__init__()
+
+
+class SpeedChanged(Message):
+    """Emitted when playback speed changes."""
+
+    def __init__(self, speed: float) -> None:
+        self.speed = speed
+        super().__init__()
+
+
+class EqualizerChanged(Message):
+    """Emitted when equalizer preset changes."""
+
+    def __init__(self, preset: str) -> None:
+        self.preset = preset
+        super().__init__()
+
+
+class SleepTimerSet(Message):
+    """Emitted when sleep timer is set or cancelled."""
+
+    def __init__(self, minutes: int, active: bool) -> None:
+        self.minutes = minutes
+        self.active = active
+        super().__init__()
+
+
+class AutoplayToggled(Message):
+    """Emitted when autoplay/radio mode is toggled."""
+
+    def __init__(self, enabled: bool) -> None:
+        self.enabled = enabled
+        super().__init__()
+
+
+class AddToPlaylist(Message):
+    """Emitted to add a track to a playlist."""
+
+    def __init__(self, result: SearchResult, playlist_id: int) -> None:
+        self.result = result
+        self.playlist_id = playlist_id
+        super().__init__()

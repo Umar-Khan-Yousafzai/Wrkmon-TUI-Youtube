@@ -544,3 +544,89 @@ class Database:
             (datetime.now(),),
         )
         self._conn.commit()
+
+    # ==================== Search History ====================
+
+    def add_search_query(self, query: str, result_count: int = 0) -> None:
+        """Record a search query for autocomplete."""
+        self._conn.execute(
+            """
+            INSERT INTO search_history (query, result_count, searched_at)
+            VALUES (?, ?, ?)
+            """,
+            (query.strip().lower(), result_count, datetime.now()),
+        )
+        self._conn.commit()
+
+    def get_search_suggestions(self, prefix: str, limit: int = 10) -> list[str]:
+        """Get search suggestions based on prefix."""
+        cursor = self._conn.execute(
+            """
+            SELECT query, COUNT(*) as freq
+            FROM search_history
+            WHERE query LIKE ?
+            GROUP BY query
+            ORDER BY freq DESC, MAX(searched_at) DESC
+            LIMIT ?
+            """,
+            (f"{prefix.strip().lower()}%", limit),
+        )
+        return [row["query"] for row in cursor.fetchall()]
+
+    def get_recent_searches(self, limit: int = 20) -> list[str]:
+        """Get recent unique search queries."""
+        cursor = self._conn.execute(
+            """
+            SELECT query, MAX(searched_at) as last_searched
+            FROM search_history
+            GROUP BY query
+            ORDER BY last_searched DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        return [row["query"] for row in cursor.fetchall()]
+
+    def clear_search_history(self) -> int:
+        """Clear search history. Returns count deleted."""
+        cursor = self._conn.execute("DELETE FROM search_history")
+        self._conn.commit()
+        return cursor.rowcount
+
+    # ==================== Downloads Tracking ====================
+
+    def record_download(self, track_id: int, file_path: str, file_size: int = 0) -> None:
+        """Record a downloaded track."""
+        self._conn.execute(
+            """
+            INSERT OR REPLACE INTO downloads (track_id, file_path, file_size, downloaded_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (track_id, file_path, file_size, datetime.now()),
+        )
+        self._conn.commit()
+
+    def get_download_path(self, video_id: str) -> Optional[str]:
+        """Get the local file path for a downloaded track."""
+        cursor = self._conn.execute(
+            """
+            SELECT d.file_path FROM downloads d
+            JOIN tracks t ON t.id = d.track_id
+            WHERE t.video_id = ?
+            """,
+            (video_id,),
+        )
+        row = cursor.fetchone()
+        return row["file_path"] if row else None
+
+    def get_all_downloads(self) -> list[dict]:
+        """Get all downloaded tracks."""
+        cursor = self._conn.execute(
+            """
+            SELECT d.*, t.video_id, t.title, t.channel, t.duration
+            FROM downloads d
+            JOIN tracks t ON t.id = d.track_id
+            ORDER BY d.downloaded_at DESC
+            """
+        )
+        return [dict(row) for row in cursor.fetchall()]

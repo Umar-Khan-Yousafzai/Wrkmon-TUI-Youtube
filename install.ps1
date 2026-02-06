@@ -4,7 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "==================================" -ForegroundColor Cyan
-Write-Host "  wrkmon Installer v1.1.0" -ForegroundColor Cyan
+Write-Host "  wrkmon Installer v1.3.0" -ForegroundColor Cyan
 Write-Host "==================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -145,8 +145,7 @@ Write-Host "  wrkmon deps     : Check dependencies"
 Write-Host ""
 Write-Host "Controls:" -ForegroundColor Yellow
 Write-Host "  F1-F4  : Switch views (Search, Queue, History, Playlists)"
-Write-Host "  F5     : Play/Pause"
-Write-Host "  F9     : Stop"
-Write-Host "  F10    : Add to queue"
-Write-Host "  /      : Focus search"
+Write-Host "  F5     : Play/Pause      b : Focus mode"
+Write-Host "  F9     : Stop            l : Lyrics"
+Write-Host "  F10    : Add to queue    ? : Help"
 Write-Host ""

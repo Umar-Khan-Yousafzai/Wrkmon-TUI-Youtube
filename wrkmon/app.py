@@ -26,9 +26,13 @@ from wrkmon.core.youtube import YouTubeClient, SearchResult
 from wrkmon.core.player import AudioPlayer
 from wrkmon.core.queue import PlayQueue
 from wrkmon.core.cache import Cache
+from wrkmon.core.lyrics import LyricsFetcher
+from wrkmon.core.sleep_timer import SleepTimer
+from wrkmon.core.downloader import Downloader
 from wrkmon.data.database import Database
 from wrkmon.utils.config import get_config
 from wrkmon.utils.stealth import get_stealth
+from wrkmon.utils.notifications import send_notification
 
 from wrkmon.ui.theme import APP_CSS
 from wrkmon.ui.widgets.header import HeaderBar
@@ -42,8 +46,17 @@ from wrkmon.ui.messages import (
     TrackQueued,
     StatusMessage,
     PlaybackStateChanged,
+    SpeedChanged,
+    EqualizerChanged,
+    SleepTimerSet,
+    AutoplayToggled,
+    AddToPlaylist,
 )
 from wrkmon.ui.screens.help import HelpScreen
+from wrkmon.ui.screens.lyrics import LyricsScreen
+from wrkmon.ui.screens.focus import FocusScreen
+from wrkmon.ui.screens.theme_picker import ThemePickerScreen
+from wrkmon.ui.screens.playlist_selector import PlaylistSelectorScreen
 from wrkmon.utils.updater import (
     check_for_updates_async,
     check_dependencies,
@@ -86,6 +99,14 @@ class WrkmonApp(App):
         Binding("k", "cursor_up", "Up", show=False),
         Binding("g", "cursor_top", "Top", show=False),
         Binding("G", "cursor_bottom", "Bottom", show=False, key_display="shift+g"),
+        # New features
+        Binding("b", "focus_mode", "Focus", show=False),
+        Binding("l", "show_lyrics", "Lyrics", show=False),
+        Binding("]", "speed_up", "Speed+", show=False),
+        Binding("[", "speed_down", "Speed-", show=False),
+        Binding("t", "show_theme_picker", "Theme", show=False),
+        Binding("d", "download_current", "Download", show=False),
+        Binding("a", "toggle_autoplay", "Autoplay", show=False),
         # Help
         Binding("?", "show_help", "Help", show=True, priority=True),
         # App controls
@@ -107,11 +128,18 @@ class WrkmonApp(App):
         self.queue = PlayQueue()
         self.cache = Cache()
         self.database = Database()
+        self.lyrics_fetcher = LyricsFetcher()
+        self.sleep_timer = SleepTimer()
+        self.downloader = Downloader(
+            download_dir=self._config.download_directory or None
+        )
 
         # State
         self._volume = self._config.volume
         self._current_track: SearchResult | None = None
         self._current_view = "search"
+        self._autoplay = self._config.autoplay
+        self._playback_speed = self._config.playback_speed
 
         # Restore playback settings from config
         self.queue.repeat_mode = self._config.repeat_mode
@@ -194,6 +222,13 @@ class WrkmonApp(App):
 
         # Start media keys handler (for Fn+Play/Pause, Next, Previous)
         await self._start_media_keys()
+
+        # Set sleep timer callback
+        self.sleep_timer.set_callback(self._on_sleep_timer_expired)
+
+        # Restore playback speed from config
+        if self._playback_speed != 1.0 and self.player.is_connected:
+            await self.player.set_speed(self._playback_speed)
 
         # Load saved queue
         self._load_saved_queue()
@@ -448,6 +483,19 @@ class WrkmonApp(App):
             )
             self.database.add_to_history(track)
 
+            # Desktop notification
+            if self._config.notifications_enabled:
+                asyncio.create_task(
+                    send_notification(
+                        title="Now Playing",
+                        body=f"{result.title[:60]} - {result.channel}",
+                    )
+                )
+
+            # Apply saved speed if not 1.0
+            if self._playback_speed != 1.0:
+                await self.player.set_speed(self._playback_speed)
+
             # Add to queue if empty
             if self.queue.is_empty:
                 self.add_to_queue(result)
@@ -560,7 +608,7 @@ class WrkmonApp(App):
             pass
 
     async def _on_track_end(self) -> None:
-        """Handle track end - play next."""
+        """Handle track end - play next or autoplay related."""
         next_item = self.queue.next()
         if next_item:
             result = SearchResult(
@@ -571,6 +619,23 @@ class WrkmonApp(App):
                 view_count=0,
             )
             await self.play_track(result)
+        elif self._autoplay and self._current_track:
+            # Autoplay/radio mode: search for related and play
+            logger.info("Autoplay: searching for related tracks...")
+            try:
+                results = await self.youtube.search(
+                    self._current_track.title + " " + self._current_track.channel,
+                    max_results=5,
+                )
+                # Pick the first result that isn't the current track
+                for r in results:
+                    if r.video_id != self._current_track.video_id:
+                        self.add_to_queue(r)
+                        await self.play_track(r)
+                        self.notify(f"Autoplay: {r.title[:40]}...", timeout=3)
+                        break
+            except Exception as e:
+                logger.error(f"Autoplay failed: {e}")
 
     # ----------------------------------------
     # Actions
@@ -754,6 +819,96 @@ class WrkmonApp(App):
         """Jump to bottom of current list (vim G key)."""
         self._navigate_list_to(-1)
 
+    # ----------------------------------------
+    # New feature actions
+    # ----------------------------------------
+    def action_focus_mode(self) -> None:
+        """Show the focus mode screen."""
+        self.push_screen(FocusScreen())
+
+    async def action_show_lyrics(self) -> None:
+        """Fetch and show lyrics for the current track."""
+        if not self._current_track:
+            self.notify("No track playing", severity="warning", timeout=2)
+            return
+        self.notify("Fetching lyrics...", timeout=2)
+        lyrics = await self.lyrics_fetcher.fetch(self._current_track.title)
+        self.push_screen(LyricsScreen(self._current_track.title, lyrics or ""))
+
+    async def action_speed_up(self) -> None:
+        """Increase playback speed by 0.1."""
+        self._playback_speed = min(3.0, round(self._playback_speed + 0.1, 1))
+        if self.player.is_connected:
+            await self.player.set_speed(self._playback_speed)
+        self.notify(f"Speed: {self._playback_speed}x", timeout=1)
+
+    async def action_speed_down(self) -> None:
+        """Decrease playback speed by 0.1."""
+        self._playback_speed = max(0.25, round(self._playback_speed - 0.1, 1))
+        if self.player.is_connected:
+            await self.player.set_speed(self._playback_speed)
+        self.notify(f"Speed: {self._playback_speed}x", timeout=1)
+
+    def action_show_theme_picker(self) -> None:
+        """Show the theme picker screen."""
+        def on_theme_selected(theme_name: str | None) -> None:
+            if theme_name:
+                self._config.set("ui", "theme", theme_name)
+                self._config.save()
+                self.notify(f"Theme set to: {theme_name}", timeout=2)
+        self.push_screen(ThemePickerScreen(), callback=on_theme_selected)
+
+    async def action_download_current(self) -> None:
+        """Download the currently playing track."""
+        if not self._current_track:
+            self.notify("No track playing to download", severity="warning", timeout=2)
+            return
+        track = self._current_track
+        self.notify(f"Downloading: {track.title[:40]}...", timeout=3)
+        try:
+            path = await self.downloader.download(track.video_id, track.title)
+            if path:
+                self.database.record_download(track.video_id, str(path), path.stat().st_size)
+                self.notify(f"Downloaded: {path.name}", timeout=4)
+            else:
+                self.notify("Download failed", severity="error", timeout=3)
+        except Exception as e:
+            logger.error(f"Download failed: {e}")
+            self.notify(f"Download error: {e}", severity="error", timeout=3)
+
+    def action_toggle_autoplay(self) -> None:
+        """Toggle autoplay/radio mode."""
+        self._autoplay = not self._autoplay
+        self._config.set("general", "autoplay", self._autoplay)
+        state = "ON" if self._autoplay else "OFF"
+        self.notify(f"Autoplay: {state}", timeout=2)
+
+    async def action_add_to_playlist(self) -> None:
+        """Show playlist selector for current track."""
+        if not self._current_track:
+            self.notify("No track to add", severity="warning", timeout=2)
+            return
+        def on_playlist_selected(playlist_id: int | None) -> None:
+            if playlist_id is not None:
+                track = self.database.get_or_create_track(
+                    video_id=self._current_track.video_id,
+                    title=self._current_track.title,
+                    channel=self._current_track.channel,
+                    duration=self._current_track.duration,
+                )
+                self.database.add_track_to_playlist(playlist_id, track.id)
+                self.notify("Added to playlist!", timeout=2)
+        self.push_screen(
+            PlaylistSelectorScreen(self._current_track.title),
+            callback=on_playlist_selected,
+        )
+
+    async def _on_sleep_timer_expired(self) -> None:
+        """Called when the sleep timer fires."""
+        logger.info("Sleep timer expired, stopping playback")
+        await self.action_stop()
+        self.notify("Sleep timer: playback stopped", timeout=5)
+
     def _navigate_list(self, delta: int) -> None:
         """Navigate in the current view's list."""
         try:
@@ -820,10 +975,15 @@ class WrkmonApp(App):
         # Save queue to database
         self._save_queue()
 
+        # Stop sleep timer
+        await self.sleep_timer.stop()
+
         # Save all settings to config
         self._config.volume = self._volume
         self._config.repeat_mode = self.queue.repeat_mode
         self._config.shuffle = self.queue.shuffle_mode
+        self._config.set("player", "playback_speed", self._playback_speed)
+        self._config.set("general", "autoplay", self._autoplay)
         self._config.save()
         logger.info(f"  Saved settings: vol={self._volume}, repeat={self.queue.repeat_mode}, shuffle={self.queue.shuffle_mode}")
 

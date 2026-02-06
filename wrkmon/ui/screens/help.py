@@ -33,21 +33,26 @@ HELP_TEXT = """
   [bold purple]F9 / s[/]      Stop playback
   [bold purple]r[/]           Cycle repeat mode (Off → One → All)
   [bold purple]m[/]           Mute / Unmute
+  [bold purple]] [/]          Speed up (0.1x)
+  [bold purple][ [/]          Speed down (0.1x)
+
+[bold orange1]FEATURES[/]
+  [bold purple]l[/]           Show lyrics for current track
+  [bold purple]b[/]           Focus mode (clean screen)
+  [bold purple]d[/]           Download current track
+  [bold purple]a[/]           Toggle autoplay / radio mode
+  [bold purple]t[/]           Theme picker
 
 [bold orange1]SEARCH & QUEUE[/]
   [bold purple]/[/]           Focus search input
   [bold purple]Enter[/]       Play selected track
-  [bold purple]a[/]           Add selected to queue
   [bold purple]F10[/]         Add highlighted to queue
   [bold purple]d / Del[/]     Remove from queue
   [bold purple]c[/]           Clear queue
 
-[bold orange1]VIEW OPTIONS[/]
-  [bold purple]t[/]           Toggle thumbnail preview
+[bold orange1]APPLICATION[/]
   [bold purple]?[/]           Show this help
   [bold purple]Escape[/]      Close overlay / Go back
-
-[bold orange1]APPLICATION[/]
   [bold purple]Ctrl+Q[/]      Quit application
   [bold purple]Ctrl+C[/]      Quit application
 
