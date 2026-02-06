@@ -6,9 +6,11 @@ from textual.widgets import Static, ListView, ProgressBar
 from textual.binding import Binding
 from textual.reactive import reactive
 
+from wrkmon.core.youtube import SearchResult
 from wrkmon.ui.widgets.result_item import QueueItem
-from wrkmon.ui.messages import StatusMessage
+from wrkmon.ui.messages import TrackSelected, StatusMessage
 from wrkmon.utils.stealth import get_stealth
+from textual import on
 
 
 class QueueView(Vertical):
@@ -82,6 +84,8 @@ class QueueView(Vertical):
                         duration=item.duration,
                         index=i + 1,
                         is_current=is_current,
+                        video_id=item.video_id,
+                        channel=item.channel,
                     )
                 )
 
@@ -189,3 +193,22 @@ class QueueView(Vertical):
                 self.refresh_queue()
         except Exception:
             pass
+
+    @on(ListView.Selected, "#queue-list")
+    def handle_queue_item_selected(self, event: ListView.Selected) -> None:
+        """Handle click/Enter on a queue item - play it."""
+        if isinstance(event.item, QueueItem):
+            item = event.item
+            # Jump to this item in the queue
+            queue_index = item.index - 1  # index is 1-based display
+            self.app.queue.jump_to(queue_index)
+            result = SearchResult(
+                video_id=item.video_id,
+                title=item.title,
+                channel=item.channel,
+                duration=item.duration,
+                view_count=0,
+            )
+            self.post_message(TrackSelected(result))
+            self._update_status(f"Playing: {item.title[:40]}...")
+            self.refresh_queue()

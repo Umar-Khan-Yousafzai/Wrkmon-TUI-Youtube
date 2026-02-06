@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wrkmon"
-version = "1.3.2"
+version = "1.3.3"
 description = "Stealth TUI YouTube audio player - stream music while looking productive"
 readme = "README.md"
 requires-python = ">=3.10"

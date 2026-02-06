@@ -47,6 +47,8 @@ class QueueItem(ListItem):
         duration: int,
         index: int,
         is_current: bool = False,
+        video_id: str = "",
+        channel: str = "",
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -54,6 +56,8 @@ class QueueItem(ListItem):
         self.duration = duration
         self.index = index
         self.is_current = is_current
+        self.video_id = video_id
+        self.channel = channel
         self._stealth = get_stealth()
 
     def compose(self) -> ComposeResult:
